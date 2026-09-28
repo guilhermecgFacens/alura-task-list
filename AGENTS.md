@@ -1,12 +1,16 @@
 # AGENTS.md
 
-Guia para agentes de IA (Claude Code, Cursor, Copilot, etc.) trabalhando neste repositório.
+Guia rápido para agentes de IA (Claude Code, Cursor, Copilot, etc.) trabalhando neste repositório.
+
+⚠️ **Fonte de verdade:** [PRD.md](PRD.md) — decisões técnicas (T-xx, P-xx), padrões e regras que **não podem ser quebradas**. Este arquivo é um resumo operacional. Leia o PRD antes de qualquer mudança arquitetural.
 
 ## O que é o projeto
 
 Gerenciador de tasks simples: login por email, dashboard com tasks e status (`TODO` / `IN_PROGRESS` / `DONE`).
 
-Stack: **Next.js (App Router)** + **TypeScript** + **Prisma (SQLite)** + **JWT**.
+Stack: **Next.js (App Router)** + **TypeScript** + **Prisma (SQLite)** + **JWT** + **Zod** (validação).
+
+**Princípio:** simplicidade didática > robustez de produção (PRD P-00).
 
 ## Estrutura de pastas
 
@@ -17,11 +21,17 @@ src/
 └── backend/    # regras de negócio, Prisma, autenticação (alias de import: @backend/*)
 ```
 
-Regra principal: **rotas em `src/app/` não devem conter lógica de negócio.** Elas chamam funções de `src/backend/` e renderizam componentes de `src/frontend/`.
+Regra principal (T-01): **rotas em `src/app/` não devem conter lógica de negócio.** Elas chamam funções de `src/backend/` e renderizam componentes de `src/frontend/`.
 
-Convenções específicas de `src/frontend/` (containers vs. components, camada de services, etc.) estão em [src/frontend/AGENTS.md](src/frontend/AGENTS.md).
+### Documentação detalhada
 
-Aliases de import configurados em [tsconfig.json](tsconfig.json): `@/*`, `@frontend/*`, `@backend/*`.
+- **[PRD.md](PRD.md)** — Decisões técnicas com ID (T-30..T-36 para backend, T-40..T-45 para REST, T-10..T-19 para frontend). Refira-se pelas IDs em PRs e comentários.
+- **[src/backend/AGENTS.md](src/backend/AGENTS.md)** — Padrões detalhados: uso-casos, Zod, DTOs, data layer, testes (TDD), erros de domínio.
+- **[src/frontend/AGENTS.md](src/frontend/AGENTS.md)** — Containers vs. components, services, composição.
+
+### Aliases
+
+Configurados em [tsconfig.json](tsconfig.json): `@/*`, `@frontend/*`, `@backend/*`. Sempre importe o caminho completo do arquivo (sem `index.ts` barrel).
 
 ## Comandos
 
@@ -37,25 +47,101 @@ Aliases de import configurados em [tsconfig.json](tsconfig.json): `@/*`, `@front
 | `npm run test:backend` | Testes do backend (Vitest, ambiente `node`), arquivos `*.test.ts` em `src/backend/` |
 | `npm run test:frontend` | Testes do frontend (Vitest, ambiente `jsdom` + Testing Library), arquivos `*.test.tsx`/`*.test.ts` em `src/frontend/` |
 
-Configuração em [vitest.config.ts](vitest.config.ts) (dois projetos Vitest) e [vitest.setup.ts](vitest.setup.ts) (jest-dom para o projeto frontend).
+Configuração: [vitest.config.ts](vitest.config.ts) (dois projetos) e [vitest.setup.ts](vitest.setup.ts) (jest-dom).
 
 ## Convenções de código
 
-- TypeScript em modo `strict` (ver [tsconfig.json](tsconfig.json)) — não introduza `any` nem desative checks para contornar erros de tipo.
-- Sem lógica de negócio dentro de `src/app/`; lógica vai em `src/backend/`.
-- Componentes React ficam em `src/frontend/components/`.
-- Autenticação: JWT simplificado, sem senha (login só por email) — isso é intencional para fins didáticos, não é um bug a corrigir.
-- Banco: SQLite via Prisma, schema em `src/backend/prisma/schema.prisma`. Qualquer mudança de modelo exige `npm run prisma:migrate`.
-- MCP: [.mcp.json](.mcp.json) registra um servidor `sqlite` (`mcp-server-sqlite-npx`) apontando para `src/backend/prisma/dev.db`, para agentes consultarem o banco diretamente.
+### Transversais (T-60..T-63)
 
-## Armadilhas conhecidas
+- **TypeScript `strict`** — sem `any`, sem `@ts-ignore`. Resolver tipos de verdade.
+- **Nomes em inglês** (variáveis, funções, tipos). **UI/erros em português** (pt-BR).
+- **Sem lógica de negócio em `src/app/`** — é só "casca" de roteamento (T-01..T-03).
 
-- **Nunca rode `next dev` diretamente sem `--webpack`** — Turbopack tem um crash conhecido no Windows. Sempre use `npm run dev`.
+### Backend (T-30..T-36)
+
+- **Um caso de uso = uma função** (ex.: `listTasks`, `createTask`). Nada de classe Service genérica.
+- **Validação com Zod** (não regex/if). Schemas em `<entidade>/schema.ts`. Erros de validação → **erros de domínio** (classes que estendem `Error`).
+- **DTOs obrigatórios** no retorno — mapear Prisma cru com `toTaskDTO()`. Nunca expor campos internos (ex.: `userId`).
+- **Camada de dados isolada** — `src/backend/data/<entidade>.ts` é o **único lugar** que importa Prisma. Use-cases importam de `data/*`, nunca do Prisma direto.
+- **Autorização por dono na query** — `userId` sempre vem do JWT, nunca de body/query (T-36, T-42).
+- **TDD:** testes antes da implementação, cobrindo edge cases, não só happy path (T-51).
+
+Detalhes em [src/backend/AGENTS.md](src/backend/AGENTS.md).
+
+### Frontend (T-10..T-19)
+
+- **Só Client Components** — `"use client"` em containers e components. Nada de Server Components/Actions.
+- **Containers smart** (estado, API, sessão). **Components dumb** (props → render).
+- **Todo fetch via `services/`** — nunca diretamente em componente.
+
+Detalhes em [src/frontend/AGENTS.md](src/frontend/AGENTS.md).
+
+### Dados (T-20..T-24, T-38)
+
+- **Autenticação:** JWT 7 dias. Sem senha (P-01 — intencional didático).
+- **SQLite via Prisma** — schema em `src/backend/prisma/schema.prisma`. Mudança → `npm run prisma:migrate`.
+
+## Armadilhas e regras anti-alucinação
+
+### Técnicas
+
+- **Nunca rode `next dev` diretamente sem `--webpack`** — Turbopack crasha no Windows. Sempre `npm run dev`.
 - `src/backend/prisma/dev.db` é local e não versionado; não assuma que existe até rodar `npm run setup` ou `npm run prisma:migrate`.
 - `.env` não é versionado (copiado de `.env.example` no setup).
 
-## Antes de abrir um PR
+### Para agentes de IA
 
-- Rode `npm run lint`.
-- Rode `npm run build` para garantir que o projeto compila.
-- Se alterou `schema.prisma`, confirme que a migration foi criada e commitada em `src/backend/prisma/migrations/`.
+- **Não crie padrões paralelos.** Copie a forma dos exemplos existentes (`tasks/use-cases.ts`, `[id]/route.ts`, `DashboardView`/`TaskList`).
+- **Não adicione dependências** (state managers, UI kits, bancos alternativos) sem aprovação (T-00).
+- **Não implemente features de §2.6 do PRD** (fora de escopo) sem perguntar.
+- **Conflito com PRD.md?** Aponte e pergunte. Não escolha sozinho.
+- **Mudanças arquiteturais** (Server Components, auth, banco, estado global) precisam de aprovação explícita.
+- Siga a skill **feature-flow**: discovery → plano confirmado → TDD/implementação → verificação + code-reviewer. **Não abra PR** — o usuário faz.
+
+## Checklist antes de abrir um PR
+
+Baseado em [PRD.md §11](PRD.md#11-checklist-rápido-de-revisão):
+
+### Build & Lint
+
+- [ ] `npm run lint` — sem erros
+- [ ] `npm run build` — compila sem erros (TypeScript `strict`)
+- [ ] `npm run test:backend` — se tocou `src/backend/`
+- [ ] `npm run test:frontend` — se tocou `src/frontend/`
+
+### Arquitetura
+
+- [ ] Nenhuma lógica em `src/app/` (T-01..T-03)
+- [ ] Use-case valida com Zod antes de chamar data layer (T-32)
+- [ ] Prisma só em `src/backend/data/` (T-34)
+- [ ] Retorno via DTO, sem `userId` (T-35)
+- [ ] `userId` vem do token e toda query filtra por ele (T-36, T-42)
+
+### Qualidade
+
+- [ ] Erros de domínio → status HTTP corretos (T-41)
+- [ ] Components sem fetch/services; Estado e API no container (T-11, T-12, T-15)
+- [ ] Sem Server Components/Actions (T-10)
+- [ ] Loading + erro visíveis na UI (P-06)
+- [ ] Testes cobrindo edge cases, não só happy path (T-51)
+
+### Schema
+
+- [ ] Se alterou `schema.prisma`, migration foi criada e commitada em `src/backend/prisma/migrations/`
+
+### MCP
+
+- [.mcp.json](.mcp.json) registra um servidor `sqlite` para agentes consultarem o banco (skill `sqlite-mcp`).
+
+---
+
+## Referências rápidas
+
+| Documento | Uso |
+|---|---|
+| [PRD.md](PRD.md) | ⭐ **Leia primeiro.** Decisões T-xx, P-xx, D-xx. Fonte de verdade. |
+| [src/backend/AGENTS.md](src/backend/AGENTS.md) | Padrões: Zod, DTO, data layer, erros, testes TDD |
+| [src/frontend/AGENTS.md](src/frontend/AGENTS.md) | Containers/components, services, composição |
+| [.claude/skills/feature-flow/SKILL.md](.claude/skills/feature-flow/SKILL.md) | Fluxo discovery → plano → TDD → verificação |
+| [README.md](README.md) | Setup e instruções para rodar o projeto |
+| [docs/plano-*.md](docs/) | Planos de features (ex.: plano-endpoint-listar-tasks.md) |

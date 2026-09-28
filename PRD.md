@@ -1,167 +1,290 @@
-# PRD.md — Gerenciador de Tasks
+# PRD + Decisões Técnicas — Gerenciador de Tasks
 
-Documento de produto e decisões técnicas. Serve como fonte de verdade para o que este projeto é, por que foi construído do jeito que foi, e quais regras não podem ser quebradas sem antes conversar com o usuário. [CLAUDE.md](CLAUDE.md) é o complemento operacional (comandos, checklist rápido para agentes) — este arquivo é onde o "porquê" vive.
+Documento híbrido de **requisitos de produto (PRD)** e **decisões técnicas (TDD)**. É a fonte de verdade sobre *o que* o projeto é, *por que* foi construído assim e *quais regras não podem ser quebradas* sem antes conversar com o time.
+
+Quem usa: pessoas desenvolvedoras e agentes de IA (Claude Code, Cursor, Copilot…). Para agentes, o objetivo explícito é **evitar alucinações**. Nada de inventar padrões, dependências, endpoints ou funcionalidades que não estejam descritos aqui ou no código.
+
+Documentos relacionados (operacionais, o "como"):
+
+- [AGENTS.md](AGENTS.md): comandos, estrutura, armadilhas.
+- [src/backend/AGENTS.md](src/backend/AGENTS.md): convenções detalhadas do backend.
+- [src/frontend/AGENTS.md](src/frontend/AGENTS.md): convenções detalhadas do frontend.
+- [.claude/skills/feature-flow/SKILL.md](.claude/skills/feature-flow/SKILL.md): fluxo para implementar features.
+
+Cada decisão tem um ID (`P-xx` para produto, `T-xx` para técnica) para ser citada em planos, PRs e revisões.
 
 ---
 
-## 1. Contexto e objetivo do projeto
+## 1. Contexto e princípio norteador
 
-Este é um projeto **didático**, construído em um curso de desenvolvimento full stack (Next.js). O objetivo primário não é "ter o produto mais robusto possível", é **ensinar** conceitos de arquitetura full stack de forma clara e progressiva: separação front/back, REST, ORM, autenticação, autorização por dono do recurso.
+Este é um projeto **didático**, feito em um curso de desenvolvimento full stack com Next.js. O objetivo é ensinar, de forma clara e progressiva, separação front/back, REST, ORM, validação, autenticação e autorização por dono do recurso.
 
-Isso tem uma consequência direta para qualquer agente trabalhando aqui: **simplicidade e clareza pedagógica pesam mais do que robustez de produção**. Preferir a solução mais direta e explícita à mais "correta" em termos de escala, quando as duas divergirem. Não introduzir complexidade (camadas extras, abstrações, bibliotecas) que não sirva ao objetivo de ensinar.
+> **Princípio P-00:** simplicidade e clareza pedagógica pesam mais do que robustez de produção. Quando "o mais correto para escala" e "o mais explícito e didático" divergirem, escolha o segundo. Não introduza camadas, abstrações ou bibliotecas que não sirvam ao objetivo de ensinar.
 
-## 2. O produto
+---
 
-Um To Do List / gerenciador de tarefas pessoal:
+## 2. Produto (PRD)
 
-- Cada usuário faz login (só com email, ver seção 12) e vê **somente as suas próprias tasks**.
-- Uma task tem um título e um status: `TODO` (a fazer), `IN_PROGRESS` (em andamento) ou `DONE` (concluída).
-- Fluxo esperado ao final do curso: criar task, listar tasks, mudar o status de uma task, editar o título, apagar uma task.
-- Não há colaboração entre usuários, não há categorias/tags, não há prazos/lembretes, não há anexos. Esse escopo é proposital (ver seção 12 para o equivalente do lado de auth, e não expandir por conta própria).
+### 2.1 Visão
 
-Estado atual (o que já existe, não é hipotético):
+Gerenciador de tarefas pessoal. Cada pessoa faz login e organiza as **próprias** tasks em três estados.
 
-- Landing page (`/`) com CTA para login.
-- Login por email (`/login` → `POST /api/auth/login`), sem senha.
-- Dashboard (`/dashboard`) que lista as tasks do usuário logado (`GET /api/tasks`).
-- Logout (`POST /api/auth/logout`).
-- Criação e edição de task **ainda não existem** — são os próximos passos (seção 9.2).
+### 2.2 Entidades de domínio
+
+| Entidade | Campos | Observações |
+|---|---|---|
+| `User` | `id` (cuid), `email` (único), `createdAt` | Criado automaticamente no primeiro login |
+| `Task` | `id` (cuid), `title`, `status`, `createdAt`, `updatedAt`, `userId` | Sempre pertence a exatamente um usuário |
+| `TaskStatus` | `TODO` \| `IN_PROGRESS` \| `DONE` | Rótulos na UI: "A fazer", "Em andamento", "Concluída" |
+
+### 2.3 Decisões de produto
+
+| ID | Decisão |
+|---|---|
+| P-01 | Login **somente por email**, sem senha. Email inexistente → usuário criado na hora (upsert). Não existe tela de cadastro separada, e não deve existir. |
+| P-02 | Cada usuário vê e altera **somente as próprias tasks**. Não há colaboração/compartilhamento. |
+| P-03 | Uma task tem só **título** e **status**. Título obrigatório, sem espaços nas pontas (trim), máximo de **200** caracteres (`MAX_TITLE_LENGTH`). |
+| P-04 | Toda task nova nasce com status `TODO`. |
+| P-05 | Remoção de task pede **confirmação** (modal) e é definitiva (sem lixeira/undo). |
+| P-06 | Toda ação assíncrona na UI (criar, atualizar, remover, carregar) mostra feedback de loading e mensagem de erro em pt-BR. |
+| P-07 | Textos de UI e mensagens de erro em **português (pt-BR)**. |
+
+### 2.4 Rotas de página
+
+| Rota | Container | Descrição |
+|---|---|---|
+| `/` | `LandingHero` (component) | Landing com CTA "Entrar" |
+| `/login` | `LoginForm` | Formulário de email → salva sessão → redireciona para `/dashboard` |
+| `/dashboard` | `DashboardView` | Lista tasks, cria, muda status, remove, logout. Sem sessão → redireciona para `/login` |
+
+### 2.5 Funcionalidades: estado atual
+
+| Funcionalidade | Backend | Frontend |
+|---|---|---|
+| Login / logout | ✅ | ✅ |
+| Listar tasks (com filtro opcional `?status=`) | ✅ | ✅ (sem UI de filtro) |
+| Criar task | ✅ | ✅ (`AddTaskModal`) |
+| Alterar status | ✅ | ✅ (`TaskStatusSelect`) |
+| Remover task | ✅ | ✅ (`DeleteTaskModal`) |
+| Editar título | ❌ não implementado | ❌ |
+| UI de filtro por status | n/a | ❌ não implementado |
+
+Próximo passo natural do produto: **editar título** (ver §5.4). Implemente só quando for pedido, seguindo os padrões deste documento.
+
+### 2.6 Fora de escopo (decisão explícita)
+
+Não implemente nada disto "de brinde". Se parecer necessário, **pergunte antes**:
+
+- Senha/hash, OAuth/login social, MFA, verificação de email, refresh token/rotação de sessão.
+- Qualquer mudança no fluxo de autenticação atual (P-01, T-20..T-23).
+- Compartilhamento/colaboração entre usuários.
+- Categorias, tags, prazos, lembretes, anexos, prioridades, subtarefas.
+- Paginação, busca textual, ordenação customizável, filtro por múltiplos status.
+- Qualquer banco além do SQLite.
+
+---
 
 ## 3. Stack
 
 | Camada | Escolha | Observação |
 |---|---|---|
-| Framework | Next.js (App Router) | Usado só como "cola" de roteamento — ver seção 4 |
-| Runtime de dev | Webpack (`next dev --webpack`) | Turbopack tem um crash conhecido em algumas máquinas Windows; não trocar de volta sem confirmar que o bug foi resolvido upstream |
-| UI | React (client components apenas) | Ver seção 5 — nada de Server Components |
-| Estilo | Tailwind CSS v4 | Classes utilitárias direto no JSX dos componentes |
-| ORM | Prisma | Client gerado a partir de `src/backend/prisma/schema.prisma` |
-| Banco | SQLite | Arquivo local (`dev.db`), zero setup de infra — adequado a projeto didático, não é uma escolha para produção |
-| Auth | JWT (`jsonwebtoken`) | Assinado com `JWT_SECRET`, 7 dias, guardado em `localStorage` |
-| Linguagem | TypeScript, `strict: true` | Não desativar strict mode |
+| Framework | Next.js 16 (App Router) | Só "cola" de roteamento (T-01) |
+| Dev server | Webpack (`next dev --webpack`) | Turbopack crasha no Windows. **Sempre** `npm run dev` |
+| UI | React 19, só Client Components | T-10 |
+| Estilo | Tailwind CSS v4 | Classes utilitárias direto no JSX |
+| Validação | Zod 4 | T-32 |
+| ORM | Prisma 6 | Schema em `src/backend/prisma/schema.prisma` |
+| Banco | SQLite (`src/backend/prisma/dev.db`) | Arquivo local, não versionado |
+| Auth | JWT (`jsonwebtoken`), 7 dias | T-20 |
+| Linguagem | TypeScript `strict` | Sem `any`, sem desligar checks |
+| Testes | Vitest 4 (backend: `node`; frontend: `jsdom` + Testing Library) | T-50 |
+| Node | ≥ 20 | |
 
-Não adicionar dependências novas (state managers, UI kits, ORMs alternativos, bancos alternativos) sem perguntar antes — o valor didático de manter a stack enxuta é intencional.
+> **T-00:** não adicione dependências (state managers, UI kits, data-fetching libs, ORMs, bancos, libs de form) sem aprovação. Stack enxuta é intencional.
 
-## 4. Arquitetura: `src/app/` é só casca de roteamento
+---
 
-Esta é a decisão arquitetural mais importante do projeto e a mais fácil de violar sem perceber.
-
-### Por quê
-
-O objetivo pedagógico é deixar nítido, para quem está aprendendo, onde termina "código que só existe por causa do Next.js" e onde começa "lógica da aplicação". Se regras de negócio, chamadas ao Prisma ou JSX com estado vazarem para dentro de `src/app/`, essa fronteira desaparece e o aluno perde a referência de onde as coisas deveriam morar.
-
-### Como se aplica
+## 4. Arquitetura geral
 
 ```
 src/
-├── app/        # router do Next.js — só conecta, nunca decide
-├── frontend/   # componentes React (o que renderiza)
-└── backend/    # regras de negócio, Prisma, autenticação (o que decide)
+├── app/        # Next.js: só roteamento. Conecta, nunca decide
+├── frontend/   # React: o que renderiza (alias @frontend/*)
+└── backend/    # regras de negócio, validação, dados, auth (alias @backend/*)
 ```
 
-- **`src/app/**/page.tsx`**: importa um componente de `@frontend/components` e retorna ele. Ponto final. Sem `useState`, `useEffect`, `fetch`, condicionais, ou qualquer JSX além do componente importado.
-- **`src/app/api/**/route.ts`**: importa função(ões) de `@backend/*`, chama, e traduz o retorno ou a exceção lançada em um `NextResponse` com o status HTTP correto. Nenhuma validação de payload ou regra de negócio aqui — isso é responsabilidade do backend.
-- Toda lógica de UI (estado, efeitos, fetch) mora em `src/frontend/`. Toda lógica de negócio, acesso a dados e auth mora em `src/backend/`.
+| ID | Decisão |
+|---|---|
+| T-01 | **`src/app/` não contém lógica.** É a única pasta acoplada ao Next.js. |
+| T-02 | `src/app/**/page.tsx` apenas importa **um** container (ou component) de `@frontend/*` e o retorna. Sem hooks, fetch, condicionais ou JSX adicional. |
+| T-03 | `src/app/api/**/route.ts` apenas: (1) autentica via `getAuthPayload`, (2) extrai params/body/query, (3) chama **um** use-case de `@backend/*`, (4) traduz retorno/erro em `NextResponse`. Sem validação, sem Prisma, sem regra de negócio. |
+| T-04 | `frontend/` nunca importa de `backend/` e vice-versa. A comunicação é **somente HTTP** via API REST. |
+| T-05 | Aliases (`tsconfig.json`): `@/*`, `@frontend/*`, `@backend/*`. Sem `index.ts` barrel. Importe o caminho completo do arquivo. |
 
-Aliases (`tsconfig.json`): `@/*` → `src/*`, `@frontend/*` → `src/frontend/*`, `@backend/*` → `src/backend/*`.
+Se uma tarefa parece exigir lógica em `src/app/`, a lógica pertence a outro lugar: mova-a para `frontend/` ou `backend/`.
 
-Se uma tarefa parecer exigir escrever lógica dentro de `src/app/`, isso é sinal de que a lógica pertence a outro lugar — pare e mova.
+---
 
-## 5. Front-end: só client components, organizado por página (Container/Presenter)
+## 5. Backend
 
-### Decisão: sem Server Components
+### 5.1 Estrutura
 
-O Next.js App Router oferece Server Components por padrão, mas este projeto **não os utiliza** — todo componente em `src/frontend/` é um client component (`"use client"`). A razão é pedagógica: manter uma fronteira nítida entre "o que roda no servidor" e "o que roda no cliente" ajuda no ensino de conceitos de React puro, sem misturar com o modelo mental de RSC (que é mais avançado e específico do Next.js). Não introduzir Server Components, Server Actions, ou streaming SSR sem alinhar antes com o usuário — isso muda a arquitetura de forma significativa.
+```
+src/backend/
+├── auth.ts               # login + getAuthPayload (débito: ver §9)
+├── lib/db.ts             # singleton do PrismaClient
+├── data/                 # camada de dados: ÚNICO lugar que importa Prisma
+│   └── tasks.ts
+├── tasks/                # família de use-cases da entidade Task
+│   ├── use-cases.ts      # uma função por caso de uso + classes de erro
+│   ├── schema.ts         # schemas Zod + constantes (MAX_TITLE_LENGTH)
+│   ├── dto.ts            # TaskDTO + toTaskDTO
+│   └── tasks.test.ts     # testes dos use-cases
+└── prisma/               # schema, migrations, dev.db
+```
 
-### Decisão: organização por página, padrão Container/Presenter
+### 5.2 Decisões
 
-- Cada rota (página) tem um componente "container" que concentra **todo** o estado, chamadas de API, redirecionamentos e lógica de sessão necessários para aquela tela funcionar. Hoje esse papel é cumprido por `LoginForm` e `DashboardView` — ambos ainda misturam estado + fetch diretamente no próprio componente (ver nota abaixo).
-- Componentes de apresentação ("presenter") devem ser **dumb**: recebem dados via props, não fazem fetch, não tomam decisão de negócio. O estado que eventualmente tiverem é só de UI (ex.: um dropdown aberto/fechado), nunca dado de domínio.
-- Preferir composição de componentes (children/slots) a passar a mesma prop por várias camadas (prop drilling). Se notar que uma prop está atravessando 3+ níveis só para chegar a um componente-folha, é sinal de repensar a composição.
+| ID | Decisão |
+|---|---|
+| T-30 | **Um caso de uso = uma função exportada** em `<entidade>/use-cases.ts` (`listTasks`, `createTask`, `updateTaskStatus`, `deleteTask`). Nada de classe "Service" com vários métodos. |
+| T-31 | Use-cases não conhecem HTTP (`NextRequest`/`NextResponse`). Recebem primitivos (`userId`, `taskId`, valores crus) e retornam DTOs ou lançam erros de domínio. |
+| T-32 | **Validação com Zod** no início de todo use-case que recebe input externo, antes de tocar a camada de dados. Schemas em `<entidade>/schema.ts`. Nada de `if`s manuais de validação. `ZodError` nunca vaza. É convertido em erro de domínio. |
+| T-33 | **Erros de domínio** são classes que estendem `Error`, declaradas em `use-cases.ts` (`InvalidTitleError`, `InvalidStatusError`, `TaskNotFoundError`), com mensagem em pt-BR. |
+| T-34 | **Camada de dados** (`src/backend/data/`) é o único lugar que importa `@prisma/client`/`@backend/lib/db` para queries. Funções finas, sem regra de negócio, recebem dados já validados. (Use-cases podem importar **tipos/enums** do Prisma, como `TaskStatus`, em schema/dto.) |
+| T-35 | **DTO obrigatório no retorno.** Use-cases nunca retornam o objeto do Prisma. `TaskDTO` = `{ id, title, status, createdAt, updatedAt }`. `userId` **não** é exposto. |
+| T-36 | **Autorização por dono na própria query:** toda leitura/escrita filtra por `userId` **do token**. Escritas usam `updateMany`/`deleteMany` com `where: { id, userId }` e checam `count`. `count === 0` → `TaskNotFoundError` (404). Nunca revele se a task existe mas é de outro usuário. |
+| T-37 | Nova entidade → nova pasta `<entidade>/` com `use-cases.ts`, `schema.ts`, `dto.ts`, `<entidade>.test.ts`, e `data/<entidade>.ts`. |
+| T-38 | Mudança em `schema.prisma` exige `npm run prisma:migrate` e commit da migration em `src/backend/prisma/migrations/`. |
 
-### Estado atual vs. estado alvo (não confundir)
+### 5.3 Contrato REST
 
-`LoginForm.tsx` e `DashboardView.tsx` ainda concentram `useState` + `fetch` direto dentro do próprio componente, sem separação container/presenter explícita. **Isso é uma decisão aceita para o estágio atual do curso, não um bug a corrigir de surpresa** em uma tarefa não relacionada. Ao adicionar uma tela nova (criar/editar task), é o momento de já introduzir a separação container/presenter com mais rigor, em vez de replicar o padrão atual.
+Todos os endpoints de tasks exigem `Authorization: Bearer <token>`. Corpo e respostas em JSON. Erros sempre no formato `{ "error": "<mensagem pt-BR>" }`.
 
-## 6. Back-end: route handlers finos + casos de uso em `src/backend/`
+| Método | URI | Body / Query | Sucesso | Erros |
+|---|---|---|---|---|
+| `POST` | `/api/auth/login` | `{ email }` | `200` `{ token, user: { id, email } }` | `400` email inválido |
+| `POST` | `/api/auth/logout` | — | `200` `{ ok: true }` (stateless; o cliente apaga a sessão) | — |
+| `GET` | `/api/tasks` | `?status=TODO\|IN_PROGRESS\|DONE` (opcional) | `200` `{ tasks: TaskDTO[], count }` | `400` status inválido, `401` |
+| `POST` | `/api/tasks` | `{ title }` | `201` `TaskDTO` | `400` título inválido, `401` |
+| `PATCH` | `/api/tasks/:id` | `{ status }` | `200` `TaskDTO` | `400` status inválido, `401`, `404` |
+| `DELETE` | `/api/tasks/:id` | — | `204` sem corpo | `401`, `404` |
 
-- Next.js Route Handlers (`src/app/api/**/route.ts`) são usados apenas como o transporte HTTP: recebem a requisição, chamam a função de caso de uso correspondente, devolvem a resposta.
-- Cada operação de negócio (fazer login, listar tasks, criar task, atualizar task, deletar task) é uma **função dedicada** em `src/backend/` — um caso de uso por função, não um service genérico com vários métodos. Ver `login()` em `auth.ts` e `listTasks()` em `tasks.ts` como modelo.
-- Padrão REST para definir recursos e verbos: `/api/tasks` (coleção), `POST` para criar, `GET` para listar. Update de uma task específica deve seguir o padrão REST (`PATCH /api/tasks/:id` ou equivalente) quando implementado — ver seção 9.2.
+| ID | Decisão |
+|---|---|
+| T-40 | Recursos no plural, substantivos (`/api/tasks`, `/api/tasks/:id`). Verbo HTTP expressa a ação. Nada de `/api/createTask` ou `/api/tasks/:id/delete`. |
+| T-41 | Mapeamento fixo erro → status: validação → `400`; sem token/token inválido → `401`; recurso inexistente ou de outro usuário → `404`. Erro não mapeado é relançado (vira `500`). Cada nova classe de erro recebe **um** status fixo. |
+| T-42 | `userId` **nunca** vem de body, query ou params. Sempre `auth.sub` do JWT. |
+| T-43 | Criação responde `201` com o recurso. Remoção responde `204` sem corpo. Atualização responde `200` com o recurso atualizado. |
+| T-44 | Atualizações parciais usam `PATCH`. O `PATCH /api/tasks/:id` hoje aceita só `status`. |
+| T-45 | Datas trafegam como string ISO 8601 (serialização padrão de `Date` no JSON). |
 
-## 7. Camada de dados: acesso direto ao Prisma hoje, DAL é decisão futura (não implementada)
+### 5.4 Como estender (exemplo: editar título)
 
-Atualmente `src/backend/tasks.ts` e `src/backend/auth.ts` chamam `prisma.*` diretamente dentro da função de caso de uso — não há uma camada de acesso a dados (DAL/repository) separada.
+Siga o padrão existente, sem inventar um novo:
 
-**Decisão tomada, mas não executada**: em algum ponto futuro pode fazer sentido extrair uma DAL dedicada (funções tipo `taskRepository.findByUser()`) para isolar ainda mais Prisma do resto do backend. Isso **não é bloqueante** para as features atuais (criar/editar task) e não deve ser feito "de brinde" durante outra tarefa. Se uma tarefa exigir tocar bastante em acesso a dados de qualquer forma, é um bom momento para perguntar ao usuário se vale a pena extrair a DAL naquele momento — mas a iniciativa não deve partir do agente sem essa conversa.
+1. `schema.ts`: schema Zod reaproveitando as regras de título (P-03).
+2. `data/tasks.ts`: `updateTaskTitleByIdAndUser(userId, taskId, title)` com `updateMany` + `count` (T-36).
+3. `use-cases.ts`: `updateTaskTitle(userId, taskId, title)` → valida → `InvalidTitleError` / `TaskNotFoundError` → `toTaskDTO`.
+4. Testes antes da implementação (T-51).
+5. Route: decidir **com o time** se o `PATCH /api/tasks/:id` passa a aceitar `{ title }` e/ou `{ status }` (recomendado, por ser REST) ou se entra outro desenho. Não decida sozinho.
 
-## 8. Validação — sempre nas duas pontas, mas o back-end é quem manda
+---
 
-- Toda função em `src/backend/*` que recebe input vindo de fora (body de requisição, parâmetros) valida esse input **antes** de agir, e lança um erro tipado quando a validação falha. Modelo: `InvalidEmailError` em `auth.ts`.
-- A API route (`route.ts`) captura esse erro tipado e traduz para o status HTTP correspondente: `400` para erro de validação, `401` para não autenticado. Novos erros tipados devem seguir esse mesmo contrato (uma classe de erro → um status HTTP fixo).
-- No front-end, validar o que der de forma barata antes do fetch (`type="email"`, `required`, etc.) — isso melhora a experiência, mas **nunca substitui** a validação do backend. Nunca confiar apenas na validação client-side para decidir se um dado é válido.
+## 6. Autenticação e autorização
 
-## 9. Autenticação e autorização
+> Pronto e **congelado**. Não altere sem pedido explícito.
 
-### 9.1 Como funciona hoje (não mexer sem necessidade)
+| ID | Decisão |
+|---|---|
+| T-20 | `login(email)` valida o formato, faz `upsert` do usuário e assina um JWT `{ sub: userId, email }` com `JWT_SECRET`, expirando em `7d`. |
+| T-21 | O token é retornado no corpo, guardado em `localStorage` (`src/frontend/lib/session.ts`, chave `session`) e enviado como `Authorization: Bearer <token>` pelo `http.ts`. |
+| T-22 | `getAuthPayload(request)` é a única forma de autenticar uma requisição no backend. Retorna `null` se o token estiver ausente/inválido, e a route responde `401`. |
+| T-23 | Proteção de páginas é **só client-side** (o container verifica a sessão e redireciona). Não existe middleware server-side. As APIs se protegem sozinhas via T-22. |
+| T-24 | A ausência de senha é **intencional** (P-01). Não é bug nem vulnerabilidade a "corrigir". |
 
-- Login é só por email, sem senha. Se o email não existe na base, o usuário é criado ali mesmo via `upsert` (`login()` em `auth.ts`) — não existe uma tela de "cadastro" separada, e não deve existir.
-- Sessão é um JWT assinado com `JWT_SECRET`, validade de 7 dias, devolvido no corpo da resposta de login e guardado no `localStorage` do navegador (`src/frontend/lib/session.ts`), enviado em requisições subsequentes como header `Authorization: Bearer <token>`.
-- Autorização por dono do recurso: toda query de dados de domínio (hoje, tasks) é filtrada pelo `userId` extraído do token (`getAuthPayload(request)`), nunca por um `userId` vindo do corpo da requisição. `listTasks(userId)` em `tasks.ts` é o modelo a replicar em qualquer novo caso de uso (criar, atualizar, deletar task) — o `userId` do payload autenticado é sempre a fonte da verdade, o body da requisição nunca deve ser usado para decidir de quem é o recurso.
-- Proteção de rota privada é **só client-side** hoje: `DashboardView` verifica se existe sessão no `localStorage` e redireciona para `/login` se não houver. **Não existe middleware server-side** de autenticação ainda — não assumir que uma rota é protegida no servidor só porque parece uma área logada.
+---
 
-### 9.2 Próximas features esperadas
+## 7. Frontend
 
-Ordem natural de implementação, seguindo os padrões já estabelecidos (validação no backend, filtro por `userId`, route fina, considerar container/presenter em telas novas):
+### 7.1 Estrutura
 
-1. **`POST /api/tasks`** — criar task. Hoje `src/app/api/tasks/route.ts` só tem `GET`, com o comentário `// POST (criar task) chega na A3`. Precisa de: validação de `title` não vazio no backend, `userId` extraído do token (nunca do body), status default `TODO`.
-2. **Update de task** (título e/ou status) — endpoint ainda não existe. Provável `PATCH /api/tasks/:id`. Precisa validar que a task pertence ao usuário autenticado antes de atualizar (não apenas filtrar na leitura — checar posse antes de escrever).
-3. Implícito no fluxo de produto (seção 2), ainda sem endpoint: deletar task.
+```
+src/frontend/
+├── containers/   # "smart": estado, efeitos, chamadas a services, orquestração
+├── components/   # "dumb": só props → render
+├── services/     # acesso HTTP ao backend (http.ts + <dominio>.service.ts)
+└── lib/          # utilitários puros (session.ts)
+```
 
-Ao implementar qualquer uma dessas, o agente deve seguir os padrões já existentes no código, não inventar um padrão novo em paralelo.
+### 7.2 Decisões
 
-## 10. Padrões de código e nomenclatura
+| ID | Decisão |
+|---|---|
+| T-10 | **Somente Client Components.** Containers e components com hooks declaram `"use client"`. Proibido: Server Components com lógica, Server Actions, `fetch` em componente de servidor, `getServerSideProps`, streaming/SSR de dados. As páginas em `src/app/` são só a casca que monta o container (T-02). |
+| T-11 | **Container-Presenter, organizado por página.** Cada rota tem um container de página (`LoginForm`, `DashboardView`) que concentra estado, chamadas de API, sessão e redirecionamentos daquela rota. O estado de uma página não vaza para outras (sem estado global, sem Context compartilhado entre páginas). |
+| T-12 | **Components são dumb:** recebem dados + callbacks via props. Não importam `services/` nem `lib/session`, não fazem fetch nem tomam decisão de negócio. Estado interno só para UI (ex.: aberto/fechado). |
+| T-13 | Subcontainers são permitidos quando encapsulam uma ação completa com o próprio ciclo de loading/erro (`AddTaskModal`, `DeleteTaskModal`). Eles recebem `token` e notificam o container de página por callback (`onCreated`, `onDeleted`). Quem decide recarregar a lista é o container de página. |
+| T-14 | **Composição acima de prop drilling.** Prefira `children`/slots (ex.: `Modal` recebe `children`). Uma prop atravessando 3+ níveis só para chegar a uma folha é sinal para recompor. |
+| T-15 | **Todo fetch passa por `services/`.** Uma função por operação de API (`listTasks`, `createTask`, `updateTaskStatus`, `deleteTask`, `login`, `logout`), usando o cliente `http.ts`, que monta headers, trata `204` e lança `ApiError` com a mensagem da API. |
+| T-16 | Tipos de domínio do front (`Task`, `TaskStatus`) são definidos **uma vez**, no service correspondente, e importados de lá. O front não importa tipos do backend (T-04). |
+| T-17 | Modais reutilizam `components/Modal.tsx` (overlay, Esc, clique fora). |
+| T-18 | `<select>` nativo: `style={{ colorScheme: "light" }}` + cores explícitas nas `<option>` (o dark mode do popup nativo não é confiável). |
+| T-19 | Validação no front (`required`, `type="email"`, `maxLength`) é só UX. **O backend é a autoridade** e sempre revalida. |
 
-- Nomes de variáveis, funções, tipos: **inglês**.
-- Comentários, mensagens de erro voltadas ao usuário, textos de UI: **português (pt-BR)** — seguindo o padrão já presente (`InvalidEmailError("Email inválido")`, textos como "Entrar", "Nenhuma task ainda").
-- Erros de domínio são classes que estendem `Error` (`InvalidEmailError`), não strings soltas ou objetos genéricos — isso é o que permite a route fazer `instanceof` e mapear para o status HTTP certo.
-- TypeScript em modo `strict`. Não usar `any` para contornar erro de tipo; resolver o tipo de verdade.
+---
 
-## 11. Ambiente e execução
+## 8. Convenções transversais
 
-Variáveis de ambiente obrigatórias (`.env`, nunca commitado — usar `.env.example` como referência):
+| ID | Decisão |
+|---|---|
+| T-60 | Identificadores (variáveis, funções, tipos, arquivos) em **inglês**. Textos de UI, mensagens de erro e comentários em **pt-BR**. |
+| T-61 | TypeScript `strict`: sem `any`, sem `@ts-ignore`, sem desligar regras de lint para contornar erros. |
+| T-62 | Variáveis de ambiente: `DATABASE_URL` e `JWT_SECRET` em `.env` (não versionado; modelo em `.env.example`). |
+| T-63 | Nomes de arquivos: containers/components em `PascalCase.tsx`; services em `<dominio>.service.ts`; backend em `kebab-case.ts`. |
+| T-50 | **Testes:** backend com Vitest mockando `@backend/data/*` (nunca o banco real). Arquivos `*.test.ts` em `src/backend/`, `*.test.tsx` em `src/frontend/`. Comandos: `npm run test:backend` / `npm run test:frontend`. |
+| T-51 | **TDD no backend:** testes antes da implementação, cobrindo o caminho feliz, **cada** erro de domínio, limites de validação (vazio, só espaços, no limite, limite+1), resultado vazio como caso válido e que a camada de dados **não** é chamada quando a validação falha. |
+| T-52 | Antes de considerar a tarefa pronta: `npm run lint`, `npm run build` e os testes da área tocada, todos passando. |
+| T-53 | Acesso direto ao banco fora da aplicação (debug, inspeção) via MCP `sqlite` (`.mcp.json`), conforme a skill `sqlite-mcp`. |
 
-| Variável | Exemplo | Uso |
+---
+
+## 9. Débitos técnicos conhecidos
+
+Estes pontos estão registrados e **não** devem ser "corrigidos de surpresa" durante uma tarefa não relacionada. Corrija quando a tarefa tocar a área, ou quando for pedido.
+
+| # | Débito | Encaminhamento |
 |---|---|---|
-| `DATABASE_URL` | `file:./dev.db` | Connection string do SQLite para o Prisma |
-| `JWT_SECRET` | (string aleatória) | Chave usada para assinar/verificar o JWT de sessão |
+| D-1 | `auth.ts` importa o Prisma direto, valida com regex/`if` e retorna o `user` cru (sem DTO/Zod/data layer). | Ao mexer em auth, migrar para `src/backend/auth/` + `data/users.ts` (ver [src/backend/AGENTS.md](src/backend/AGENTS.md)), **mantendo** o comportamento (T-20..T-24). |
+| D-2 | `POST /api/tasks` faz `request.json()` sem `.catch`: um JSON malformado gera `500` em vez de `400`. | Alinhar com as outras routes (`.catch(() => null)`). |
+| D-3 | `findTasksByUser` não define ordenação. A ordem da lista não é garantida. | Se for exigido, definir ordem (ex.: `createdAt`) na camada de dados. É decisão de produto: confirmar antes. |
+| D-4 | O tipo `Task` do front não inclui `createdAt`/`updatedAt`, que a API já retorna. | Adicionar só quando a UI precisar. |
+| D-5 | `<html lang="en">` no layout, mas a UI é pt-BR. | Trocar para `pt-BR` quando for tocar o layout. |
+| D-6 | O token no `localStorage` não é validado quanto à expiração no cliente. Um token vencido só é percebido quando a API retorna `401`. | Aceito no escopo didático. |
 
-Comandos principais (ver [CLAUDE.md](CLAUDE.md) para a lista completa e atualizada):
+---
 
-```bash
-npm run setup             # instala deps, cria .env, roda migration inicial (primeira vez)
-npm run dev               # servidor de dev — sempre com --webpack, nunca turbopack (ver seção 3)
-npm run prisma:generate   # regenerar Prisma Client após mudar schema.prisma
-npm run prisma:migrate    # criar/aplicar migration após mudar schema.prisma
-```
+## 10. Regras para agentes de IA (anti-alucinação)
 
-Não existe suíte de testes configurada. Não assumir `npm test` nem escrever testes automatizados sem confirmar com o usuário que isso entrou em escopo do curso.
+1. **Verifique antes de afirmar.** Se um arquivo, função, endpoint ou campo não aparece no código ou neste documento, ele **não existe**. Não o cite como existente.
+2. **Não crie padrões paralelos.** Copie a forma dos exemplos existentes: `tasks/use-cases.ts` para o backend, `[id]/route.ts` para routes, `DashboardView`/`TaskList` para o frontend.
+3. **Não adicione dependências, rotas, campos no schema ou features** que não foram pedidos (T-00, §2.6).
+4. **Conflito com este documento?** Aponte o conflito e pergunte. Não escolha um lado em silêncio.
+5. **Mudanças arquiteturais** (Server Components, estado global, mudar a auth, trocar o banco, mover lógica para `app/`) exigem aprovação explícita.
+6. Para implementar features, siga a skill **feature-flow** (discovery → plano confirmado → TDD/implementação → verificação + `code-reviewer`). **Não abra PR**: o usuário faz isso.
+7. **Mantenha este documento vivo.** Se uma decisão for conscientemente revista, ou uma funcionalidade da §2.5 for concluída, atualize o PRD no mesmo trabalho.
 
-## 12. Fora de escopo por decisão explícita
+---
 
-Os itens abaixo foram deliberadamente deixados de fora do projeto. Não implementar nenhum destes "de brinde" durante outra tarefa — se parecer necessário a algum ponto, **perguntar ao usuário antes**, não assumir que é um gap a preencher:
+## 11. Checklist rápido de revisão
 
-- Senha / hashing de senha.
-- OAuth ou qualquer login social.
-- MFA (autenticação multifator).
-- Refresh tokens / rotação de sessão.
-- Verificação de email.
-- Compartilhamento de tasks entre usuários (colaboração).
-- Qualquer banco de dados além do SQLite.
-- Categorias, tags, prazos, lembretes, anexos em tasks.
-
-## 13. Como este documento deve ser usado por agentes
-
-- Antes de qualquer mudança que toque em arquitetura (mover lógica entre `app/`/`frontend`/`backend`, introduzir Server Components, adicionar uma dependência nova, mexer em auth), reler a seção relevante aqui.
-- Se uma instrução do usuário parecer conflitar com uma decisão registrada aqui, é preferível apontar o conflito explicitamente e perguntar, em vez de silenciosamente escolher um lado.
-- Este documento deve ser atualizado quando uma decisão registrada aqui for **conscientemente revista** pelo usuário — não deve divergir silenciosamente do estado real do código por muito tempo.
+- [ ] Nenhuma lógica em `src/app/` (T-01..T-03)
+- [ ] Use-case valida com Zod antes de chamar a camada de dados (T-32)
+- [ ] Prisma só em `src/backend/data/` (T-34)
+- [ ] Retorno via DTO, sem `userId` (T-35)
+- [ ] `userId` vem do token e toda query filtra por ele (T-36, T-42)
+- [ ] Erros de domínio → status HTTP corretos, formato `{ error }` (T-41)
+- [ ] Components sem fetch/services. Estado e API no container (T-11, T-12, T-15)
+- [ ] Sem Server Components/Actions (T-10)
+- [ ] Loading + erro visíveis na UI (P-06)
+- [ ] Testes cobrindo edge cases (T-51). Lint, build e testes OK (T-52)
