@@ -43,7 +43,7 @@ Configurados em [tsconfig.json](tsconfig.json): `@/*`, `@frontend/*`, `@backend/
 | `npm run prisma:migrate` | Aplica alterações do `schema.prisma` ao banco |
 | `npm run prisma:generate` | Regenera o Prisma Client |
 | `npm run prisma:studio` | UI visual do banco |
-
+| `npm run setup` | Setup inicial ([scripts/setup.mjs](scripts/setup.mjs)): `.env` a partir do `.env.example` e banco local |
 | `npm run test:backend` | Testes do backend (Vitest, ambiente `node`), arquivos `*.test.ts` em `src/backend/` |
 | `npm run test:frontend` | Testes do frontend (Vitest, ambiente `jsdom` + Testing Library), arquivos `*.test.tsx`/`*.test.ts` em `src/frontend/` |
 
@@ -131,7 +131,7 @@ Baseado em [PRD.md §11](PRD.md#11-checklist-rápido-de-revisão):
 
 ### MCP
 
-- [.mcp.json](.mcp.json) registra um servidor `sqlite` para agentes consultarem o banco (skill `sqlite-mcp`).
+- [.mcp.json](.mcp.json) é onde ficam os servidores MCP do projeto. A skill `sqlite-mcp` espera um servidor `sqlite` apontando para `src/backend/prisma/dev.db`; confira se ele está registrado antes de usá-lo (na versão commitada está, mas o arquivo local está sem servidores).
 
 ---
 
