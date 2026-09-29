@@ -5,11 +5,12 @@ import {
   createTask,
   deleteTask,
   updateTaskStatus,
+  InvalidDescriptionError,
   InvalidStatusError,
   InvalidTitleError,
   TaskNotFoundError,
 } from "@backend/tasks/use-cases";
-import { MAX_TITLE_LENGTH } from "@backend/tasks/schema";
+import { MAX_DESCRIPTION_LENGTH, MAX_TITLE_LENGTH } from "@backend/tasks/schema";
 import * as tasksData from "@backend/data/tasks";
 
 vi.mock("@backend/data/tasks", () => ({
@@ -23,6 +24,7 @@ const now = new Date();
 const rawTask = {
   id: "task-1",
   title: "Comprar leite",
+  description: null,
   status: TaskStatus.TODO,
   createdAt: now,
   updatedAt: now,
@@ -83,7 +85,7 @@ describe("createTask", () => {
     const result = await createTask("user-1", "Comprar leite");
 
     expect(result).toEqual(taskDto);
-    expect(tasksData.createTask).toHaveBeenCalledWith("user-1", "Comprar leite");
+    expect(tasksData.createTask).toHaveBeenCalledWith("user-1", "Comprar leite", null);
   });
 
   it("trims whitespace from the title before creating", async () => {
@@ -91,7 +93,7 @@ describe("createTask", () => {
 
     await createTask("user-1", "  Comprar leite  ");
 
-    expect(tasksData.createTask).toHaveBeenCalledWith("user-1", "Comprar leite");
+    expect(tasksData.createTask).toHaveBeenCalledWith("user-1", "Comprar leite", null);
   });
 
   it("throws InvalidTitleError for an empty title", async () => {
@@ -124,7 +126,7 @@ describe("createTask", () => {
 
     await createTask("user-1", exact);
 
-    expect(tasksData.createTask).toHaveBeenCalledWith("user-1", exact);
+    expect(tasksData.createTask).toHaveBeenCalledWith("user-1", exact, null);
   });
 
   it.each([
@@ -170,10 +172,10 @@ describe("createTask", () => {
 
     await createTask("user-1", title);
 
-    expect(tasksData.createTask).toHaveBeenCalledWith("user-1", title);
+    expect(tasksData.createTask).toHaveBeenCalledWith("user-1", title, null);
   });
 
-  it("passes only userId and title to the data layer (never a status)", async () => {
+  it("passes only userId, title and description to the data layer (never a status)", async () => {
     vi.mocked(tasksData.createTask).mockResolvedValue(rawTask);
 
     await createTask("user-1", "Comprar leite");
@@ -181,7 +183,106 @@ describe("createTask", () => {
     expect(vi.mocked(tasksData.createTask).mock.calls[0]).toEqual([
       "user-1",
       "Comprar leite",
+      null,
     ]);
+  });
+});
+
+describe("createTask description", () => {
+  beforeEach(() => {
+    vi.mocked(tasksData.createTask).mockReset();
+    vi.mocked(tasksData.createTask).mockResolvedValue(rawTask);
+  });
+
+  it("stores null when the description is omitted", async () => {
+    await createTask("user-1", "Comprar leite");
+
+    expect(tasksData.createTask).toHaveBeenCalledWith(
+      "user-1",
+      "Comprar leite",
+      null,
+    );
+  });
+
+  it("trims whitespace from the description", async () => {
+    await createTask("user-1", "Comprar leite", "  Integral  ");
+
+    expect(tasksData.createTask).toHaveBeenCalledWith(
+      "user-1",
+      "Comprar leite",
+      "Integral",
+    );
+  });
+
+  it.each([
+    ["empty", ""],
+    ["whitespace-only", "   "],
+    ["null", null],
+  ])("stores null when the description is %s", async (_label, description) => {
+    await createTask("user-1", "Comprar leite", description);
+
+    expect(tasksData.createTask).toHaveBeenCalledWith(
+      "user-1",
+      "Comprar leite",
+      null,
+    );
+  });
+
+  it("accepts a description exactly at the max length", async () => {
+    const exact = "a".repeat(MAX_DESCRIPTION_LENGTH);
+
+    await createTask("user-1", "Comprar leite", exact);
+
+    expect(tasksData.createTask).toHaveBeenCalledWith(
+      "user-1",
+      "Comprar leite",
+      exact,
+    );
+  });
+
+  it("throws InvalidDescriptionError (too long) above the max length", async () => {
+    const tooLong = "a".repeat(MAX_DESCRIPTION_LENGTH + 1);
+
+    await expect(
+      createTask("user-1", "Comprar leite", tooLong),
+    ).rejects.toThrow(InvalidDescriptionError);
+    await expect(
+      createTask("user-1", "Comprar leite", tooLong),
+    ).rejects.toThrow("Descrição muito longa");
+    expect(tasksData.createTask).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a number", 123],
+    ["an object", {}],
+    ["an array", ["a"]],
+    ["a boolean", true],
+  ])(
+    "throws InvalidDescriptionError when the description is %s",
+    async (_label, description) => {
+      await expect(
+        createTask("user-1", "Comprar leite", description),
+      ).rejects.toThrow("Descrição inválida");
+      expect(tasksData.createTask).not.toHaveBeenCalled();
+    },
+  );
+
+  it("reports the title error first when both title and description are invalid", async () => {
+    await expect(
+      createTask("user-1", "", "a".repeat(MAX_DESCRIPTION_LENGTH + 1)),
+    ).rejects.toThrow(InvalidTitleError);
+  });
+
+  it("returns the description in the DTO without userId", async () => {
+    vi.mocked(tasksData.createTask).mockResolvedValue({
+      ...rawTask,
+      description: "Integral",
+    });
+
+    const result = await createTask("user-1", "Comprar leite", "Integral");
+
+    expect(result).toEqual({ ...taskDto, description: "Integral" });
+    expect(result).not.toHaveProperty("userId");
   });
 });
 

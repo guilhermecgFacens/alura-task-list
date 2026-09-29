@@ -10,9 +10,13 @@ export function findTasksByUser(userId: string, status?: TaskStatus) {
   });
 }
 
-export function createTask(userId: string, title: string) {
+export function createTask(
+  userId: string,
+  title: string,
+  description: string | null,
+) {
   return prisma.task.create({
-    data: { title, userId },
+    data: { title, description, userId },
   });
 }
 

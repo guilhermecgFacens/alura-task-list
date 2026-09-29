@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthPayload } from "@backend/auth";
 import {
   createTask,
+  InvalidDescriptionError,
   InvalidStatusError,
   InvalidTitleError,
   listTasks,
@@ -38,10 +39,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const task = await createTask(auth.sub, body.title);
+    const task = await createTask(auth.sub, body.title, body.description);
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
-    if (error instanceof InvalidTitleError) {
+    if (
+      error instanceof InvalidTitleError ||
+      error instanceof InvalidDescriptionError
+    ) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     throw error;

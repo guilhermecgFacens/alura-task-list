@@ -8,6 +8,7 @@ import { toTaskDTO } from "./dto";
 
 export class InvalidStatusError extends Error {}
 export class InvalidTitleError extends Error {}
+export class InvalidDescriptionError extends Error {}
 export class TaskNotFoundError extends Error {}
 
 export async function listTasks(userId: string, status?: string) {
@@ -23,17 +24,41 @@ export async function listTasks(userId: string, status?: string) {
   return { tasks: dtos, count: dtos.length };
 }
 
-export async function createTask(userId: string, title: unknown) {
-  const parsed = createTaskSchema.safeParse({ title });
+export async function createTask(
+  userId: string,
+  title: unknown,
+  description?: unknown,
+) {
+  const parsed = createTaskSchema.safeParse({
+    title,
+    description: description ?? undefined,
+  });
 
   if (!parsed.success) {
-    const tooLong = parsed.error.issues[0]?.code === "too_big";
-    throw new InvalidTitleError(
-      tooLong ? "Título muito longo" : "Título é obrigatório",
+    const titleIssue = parsed.error.issues.find(
+      (issue) => issue.path[0] === "title",
+    );
+
+    if (titleIssue) {
+      throw new InvalidTitleError(
+        titleIssue.code === "too_big"
+          ? "Título muito longo"
+          : "Título é obrigatório",
+      );
+    }
+
+    throw new InvalidDescriptionError(
+      parsed.error.issues[0]?.code === "too_big"
+        ? "Descrição muito longa"
+        : "Descrição inválida",
     );
   }
 
-  const task = await tasksData.createTask(userId, parsed.data.title);
+  const task = await tasksData.createTask(
+    userId,
+    parsed.data.title,
+    parsed.data.description || null,
+  );
   return toTaskDTO(task);
 }
 
