@@ -126,6 +126,63 @@ describe("createTask", () => {
 
     expect(tasksData.createTask).toHaveBeenCalledWith("user-1", exact);
   });
+
+  it.each([
+    ["a number", 123],
+    ["null", null],
+    ["undefined", undefined],
+    ["an object", {}],
+    ["an array", ["a"]],
+    ["a boolean", true],
+  ])(
+    "throws InvalidTitleError (not TypeError) when the title is %s",
+    async (_label, title) => {
+      await expect(createTask("user-1", title)).rejects.toThrow(
+        InvalidTitleError,
+      );
+      expect(tasksData.createTask).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["empty", ""],
+    ["whitespace-only", "   "],
+    ["a number", 123],
+    ["null", null],
+    ["undefined", undefined],
+  ])("uses the 'required' message when the title is %s", async (_label, title) => {
+    await expect(createTask("user-1", title)).rejects.toThrow(
+      "Título é obrigatório",
+    );
+  });
+
+  it("uses the 'too long' message for a title over the max length", async () => {
+    const tooLong = "a".repeat(MAX_TITLE_LENGTH + 1);
+
+    await expect(createTask("user-1", tooLong)).rejects.toThrow(
+      "Título muito longo",
+    );
+  });
+
+  it("accepts a title with emoji and line breaks", async () => {
+    const title = "Comprar 🥛\nleite";
+    vi.mocked(tasksData.createTask).mockResolvedValue({ ...rawTask, title });
+
+    await createTask("user-1", title);
+
+    expect(tasksData.createTask).toHaveBeenCalledWith("user-1", title);
+  });
+
+  it("passes only userId and title to the data layer (never a status)", async () => {
+    vi.mocked(tasksData.createTask).mockResolvedValue(rawTask);
+
+    await createTask("user-1", "Comprar leite");
+
+    expect(vi.mocked(tasksData.createTask).mock.calls[0]).toEqual([
+      "user-1",
+      "Comprar leite",
+    ]);
+  });
 });
 
 describe("deleteTask", () => {

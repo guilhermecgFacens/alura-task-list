@@ -23,12 +23,13 @@ export async function listTasks(userId: string, status?: string) {
   return { tasks: dtos, count: dtos.length };
 }
 
-export async function createTask(userId: string, title: string) {
+export async function createTask(userId: string, title: unknown) {
   const parsed = createTaskSchema.safeParse({ title });
 
   if (!parsed.success) {
+    const tooLong = parsed.error.issues[0]?.code === "too_big";
     throw new InvalidTitleError(
-      title?.trim() ? "Título muito longo" : "Título é obrigatório",
+      tooLong ? "Título muito longo" : "Título é obrigatório",
     );
   }
 
