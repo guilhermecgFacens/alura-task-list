@@ -13,7 +13,7 @@ Nunca pule fases. Nunca avance de fase sem o checkpoint indicado.
 
 Objetivo: entender o problema antes de propor solução.
 
-- Leia o contexto que o usuário trouxe (descrição, card, texto solto).
+- Leia o contexto que o usuário trouxe (descrição, card do Jira ou de outro gestor de tarefas, texto solto).
 - Explore a codebase atual para entender o estado presente relacionado à tarefa (arquivos, padrões, convenções do [AGENTS.md](../../../AGENTS.md)).
 - Debata com o usuário: levante ambiguidades do card, hipóteses de abordagem, casos de borda, exceções e situações adjacentes que a feature pode tocar.
 - Não escreva código nesta fase. O objetivo é convergir em conjunto com o usuário sobre o que precisa ser feito e como.
@@ -54,7 +54,8 @@ Objetivo: garantir que a implementação está correta antes de liberar para PR.
 - Rode `npm run test:backend` se algum arquivo em `src/backend/` foi tocado, e `npm run test:frontend` se algum arquivo em `src/frontend/` foi tocado. Todos os testes precisam passar, incluindo os escritos na fase 3.
 - Acione o subagent `code-reviewer` (via `Agent`, `subagent_type: "code-reviewer"`) passando o contexto do que foi implementado (arquivos alterados, `git diff`, e o plano da fase 2) para uma revisão independente focada nas convenções do AGENTS.md, correção, segurança e simplicidade.
 - Faça também sua própria auto-revisão comparando a implementação com o plano da fase 2: confira se algum item do plano ficou pela metade, se algum edge case levantado na fase 1 foi esquecido.
-- Se o `code-reviewer` ou a auto-revisão encontrarem problemas, volte para a fase 3 (ou até a fase 2, se o plano estava errado) e corrija — não finalize com pendências conhecidas.
+- Se o `code-reviewer` ou a auto-revisão encontrarem problemas, ou se lint, build ou algum teste falhar, volte para a fase 3 (ou até a fase 2, se o plano estava errado) e corrija — não finalize com pendências conhecidas.
+- Após cada correção, repita **todas** as verificações desta fase (lint, build, testes, revisão) até ficarem limpas.
 
 ### Encerramento
 
