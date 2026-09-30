@@ -31,19 +31,46 @@ Objetivo: gerar um plano executável e revisável.
 
 Objetivo: executar o plano confirmado.
 
-Se a funcionalidade (ou parte dela) tocar código em `src/backend/`, siga TDD: escreva os testes antes de implementar.
+### Backend: TDD (Test-Driven Development)
 
-- **Testes primeiro (somente para `src/backend/`)**: antes de escrever a implementação, escreva os testes (`*.test.ts`, Vitest, ambiente `node`) cobrindo o comportamento esperado descrito no plano. Happy path sozinho não é suficiente — todo use-case precisa também de testes para os edge cases (ver [AGENTS.md do backend](../../../src/backend/AGENTS.md), seção "Testes: happy path não basta"):
-  - Cada erro de domínio que o use-case pode lançar (um teste por erro/condição, não só um genérico "lança erro").
-  - Limites de validação: vazio, só espaços/whitespace, exatamente no limite, um a mais que o limite.
-  - Resultado vazio como caso válido (lista vazia, nada encontrado) — sem lançar erro.
-  - Confirmação de que a camada de dados (mock) não foi chamada quando a validação falha antes de chegar lá.
-  - Rode os testes e confirme que falham pelo motivo certo (função/módulo ainda não existe ou não implementado), não por erro de sintaxe no próprio teste.
-  - Para interações com sistemas externos e banco de dados (Prisma, APIs externas, etc.), mocke essas dependências — não bata em banco real nem em serviços externos nos testes.
-  - Se o plano da fase 2 não detalhou os casos de teste, é aceitável refiná-los aqui, mas sem mudar o escopo combinado; se perceber que faltou um caso relevante no plano, avise o usuário.
-- **Implementação**: implemente exatamente o que foi combinado no plano, usando também o contexto da fase 1 como referência, até os testes escritos passarem (para o backend) ou seguindo o plano normalmente (para o restante do código, onde ainda não há TDD).
-- Siga as convenções do [AGENTS.md](../../../AGENTS.md) (sem lógica de negócio em `src/app/`, TypeScript strict, etc.).
-- Se durante a implementação surgir a necessidade de desviar do plano, avise o usuário antes de seguir.
+Se toca `src/backend/`, **obrigatório TDD**: escreva testes antes de implementar. Ciclo: teste falha → implementa → teste passa → refatora.
+
+#### Passo 1: Escrever os testes
+
+Antes qualquer implementação, escreva testes em `src/backend/**/*.test.ts` (Vitest, ambiente `node`). Cobrindo:
+
+**Casos de teste obrigatórios:**
+- Happy path (sucesso normal).
+- Cada erro de domínio que use-case lança (um teste por erro, não genérico "lança erro").
+- Limites de validação: vazio, só espaços/whitespace, exatamente no limite, um acima do limite.
+- Resultado vazio válido (lista vazia, nada encontrado) sem erro.
+- Mock de data layer não chamado quando validação falha antes de chegar nele.
+
+**Mocks obrigatórios:**
+- Banco de dados (Prisma): mocke sempre. Nunca bata em `dev.db` nos testes.
+- APIs externas: mocke sempre. Nunca bata em servidor real.
+- Dependências externas: trate como mock — o teste valida lógica, não integração.
+
+**Antes de implementar:**
+- Rode testes (`npm run test:backend`). Devem falhar pelo motivo certo (função/módulo não existe, não implementado), não erro de sintaxe no teste.
+- Se plano fase 2 não detalhou casos, refine aqui sem mudar escopo; avise usuário se faltar caso relevante.
+
+#### Passo 2: Implementar até testes passarem
+
+Implemente exatamente conforme plano fase 2. Use contexto fase 1. Roda testes — passam quando implementação complete.
+
+#### Passo 3: Refatora (opcional)
+
+Se testes passam, refatore para melhor código sem quebrar testes. Roda testes novamente.
+
+### Frontend: sem TDD por enquanto
+
+Implemente conforme plano fase 2 normalmente.
+
+### Geral
+
+- Siga convenções [AGENTS.md](../../../AGENTS.md) (sem lógica em `src/app/`, TypeScript strict, etc.).
+- Se precisar desviar do plano, avise usuário antes.
 
 ## Fase 4 — Verificação
 
