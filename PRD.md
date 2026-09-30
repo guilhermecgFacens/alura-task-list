@@ -34,7 +34,7 @@ Gerenciador de tarefas pessoal. Cada pessoa faz login e organiza as **próprias*
 | Entidade | Campos | Observações |
 |---|---|---|
 | `User` | `id` (cuid), `email` (único), `createdAt` | Criado automaticamente no primeiro login |
-| `Task` | `id` (cuid), `title`, `status`, `createdAt`, `updatedAt`, `userId` | Sempre pertence a exatamente um usuário |
+| `Task` | `id` (cuid), `title`, `description` (opcional), `status`, `createdAt`, `updatedAt`, `userId` | Sempre pertence a exatamente um usuário |
 | `TaskStatus` | `TODO` \| `IN_PROGRESS` \| `DONE` | Rótulos na UI: "A fazer", "Em andamento", "Concluída" |
 
 ### 2.3 Decisões de produto
@@ -43,7 +43,7 @@ Gerenciador de tarefas pessoal. Cada pessoa faz login e organiza as **próprias*
 |---|---|
 | P-01 | Login **somente por email**, sem senha. Email inexistente → usuário criado na hora (upsert). Não existe tela de cadastro separada, e não deve existir. |
 | P-02 | Cada usuário vê e altera **somente as próprias tasks**. Não há colaboração/compartilhamento. |
-| P-03 | Uma task tem só **título** e **status**. Título obrigatório, sem espaços nas pontas (trim), máximo de **200** caracteres (`MAX_TITLE_LENGTH`). |
+| P-03 | Uma task tem **título**, **descrição opcional** e **status**. Título obrigatório, sem espaços nas pontas (trim), máximo de **200** caracteres (`MAX_TITLE_LENGTH`). Descrição opcional, com trim, máximo de **500** caracteres (`MAX_DESCRIPTION_LENGTH`); vazia ou só espaços vira `null`. |
 | P-04 | Toda task nova nasce com status `TODO`. |
 | P-05 | Remoção de task pede **confirmação** (modal) e é definitiva (sem lixeira/undo). |
 | P-06 | Toda ação assíncrona na UI (criar, atualizar, remover, carregar) mostra feedback de loading e mensagem de erro em pt-BR. |
@@ -63,7 +63,7 @@ Gerenciador de tarefas pessoal. Cada pessoa faz login e organiza as **próprias*
 |---|---|---|
 | Login / logout | ✅ | ✅ |
 | Listar tasks (com filtro opcional `?status=`) | ✅ | ✅ (sem UI de filtro) |
-| Criar task | ✅ | ✅ (`AddTaskModal`) |
+| Criar task (título + descrição opcional) | ✅ | ✅ (`AddTaskModal`) |
 | Alterar status | ✅ | ✅ (`TaskStatusSelect`) |
 | Remover task | ✅ | ✅ (`DeleteTaskModal`) |
 | Editar título | ❌ não implementado | ❌ |
@@ -150,9 +150,9 @@ src/backend/
 | T-30 | **Um caso de uso = uma função exportada** em `<entidade>/use-cases.ts` (`listTasks`, `createTask`, `updateTaskStatus`, `deleteTask`). Nada de classe "Service" com vários métodos. |
 | T-31 | Use-cases não conhecem HTTP (`NextRequest`/`NextResponse`). Recebem primitivos (`userId`, `taskId`, valores crus) e retornam DTOs ou lançam erros de domínio. |
 | T-32 | **Validação com Zod** no início de todo use-case que recebe input externo, antes de tocar a camada de dados. Schemas em `<entidade>/schema.ts`. Nada de `if`s manuais de validação. `ZodError` nunca vaza. É convertido em erro de domínio. |
-| T-33 | **Erros de domínio** são classes que estendem `Error`, declaradas em `use-cases.ts` (`InvalidTitleError`, `InvalidStatusError`, `TaskNotFoundError`), com mensagem em pt-BR. |
+| T-33 | **Erros de domínio** são classes que estendem `Error`, declaradas em `use-cases.ts` (`InvalidTitleError`, `InvalidDescriptionError`, `InvalidStatusError`, `TaskNotFoundError`), com mensagem em pt-BR. |
 | T-34 | **Camada de dados** (`src/backend/data/`) é o único lugar que importa `@prisma/client`/`@backend/lib/db` para queries. Funções finas, sem regra de negócio, recebem dados já validados. (Use-cases podem importar **tipos/enums** do Prisma, como `TaskStatus`, em schema/dto.) |
-| T-35 | **DTO obrigatório no retorno.** Use-cases nunca retornam o objeto do Prisma. `TaskDTO` = `{ id, title, status, createdAt, updatedAt }`. `userId` **não** é exposto. |
+| T-35 | **DTO obrigatório no retorno.** Use-cases nunca retornam o objeto do Prisma. `TaskDTO` = `{ id, title, description, status, createdAt, updatedAt }`. `userId` **não** é exposto. |
 | T-36 | **Autorização por dono na própria query:** toda leitura/escrita filtra por `userId` **do token**. Escritas usam `updateMany`/`deleteMany` com `where: { id, userId }` e checam `count`. `count === 0` → `TaskNotFoundError` (404). Nunca revele se a task existe mas é de outro usuário. |
 | T-37 | Nova entidade → nova pasta `<entidade>/` com `use-cases.ts`, `schema.ts`, `dto.ts`, `<entidade>.test.ts`, e `data/<entidade>.ts`. |
 | T-38 | Mudança em `schema.prisma` exige `npm run prisma:migrate` e commit da migration em `src/backend/prisma/migrations/`. |
@@ -166,7 +166,7 @@ Todos os endpoints de tasks exigem `Authorization: Bearer <token>`. Corpo e resp
 | `POST` | `/api/auth/login` | `{ email }` | `200` `{ token, user: { id, email } }` | `400` email inválido |
 | `POST` | `/api/auth/logout` | — | `200` `{ ok: true }` (stateless; o cliente apaga a sessão) | — |
 | `GET` | `/api/tasks` | `?status=TODO\|IN_PROGRESS\|DONE` (opcional) | `200` `{ tasks: TaskDTO[], count }` | `400` status inválido, `401` |
-| `POST` | `/api/tasks` | `{ title }` | `201` `TaskDTO` | `400` título inválido, `401` |
+| `POST` | `/api/tasks` | `{ title, description? }` | `201` `TaskDTO` | `400` título ou descrição inválidos, `401` |
 | `PATCH` | `/api/tasks/:id` | `{ status }` | `200` `TaskDTO` | `400` status inválido, `401`, `404` |
 | `DELETE` | `/api/tasks/:id` | — | `204` sem corpo | `401`, `404` |
 
@@ -256,7 +256,6 @@ Estes pontos estão registrados e **não** devem ser "corrigidos de surpresa" du
 | # | Débito | Encaminhamento |
 |---|---|---|
 | D-1 | `auth.ts` importa o Prisma direto, valida com regex/`if` e retorna o `user` cru (sem DTO/Zod/data layer). | Ao mexer em auth, migrar para `src/backend/auth/` + `data/users.ts` (ver [src/backend/AGENTS.md](src/backend/AGENTS.md)), **mantendo** o comportamento (T-20..T-24). |
-| D-2 | `POST /api/tasks` faz `request.json()` sem `.catch`: um JSON malformado gera `500` em vez de `400`. | Alinhar com as outras routes (`.catch(() => null)`). |
 | D-3 | `findTasksByUser` não define ordenação. A ordem da lista não é garantida. | Se for exigido, definir ordem (ex.: `createdAt`) na camada de dados. É decisão de produto: confirmar antes. |
 | D-4 | O tipo `Task` do front não inclui `createdAt`/`updatedAt`, que a API já retorna. | Adicionar só quando a UI precisar. |
 | D-5 | `<html lang="en">` no layout, mas a UI é pt-BR. | Trocar para `pt-BR` quando for tocar o layout. |

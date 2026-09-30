@@ -12,6 +12,7 @@ type AddTaskModalProps = {
 
 export function AddTaskModal({ token, onClose, onCreated }: AddTaskModalProps) {
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -23,7 +24,7 @@ export function AddTaskModal({ token, onClose, onCreated }: AddTaskModalProps) {
     setLoading(true);
 
     try {
-      await createTask(token, title);
+      await createTask(token, title, description);
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível criar a task.");
@@ -51,6 +52,14 @@ export function AddTaskModal({ token, onClose, onCreated }: AddTaskModalProps) {
             onChange={(e) => setTitle(e.target.value)}
             className="rounded-lg border border-zinc-200 bg-transparent px-4 py-3 text-sm outline-none focus:border-foreground dark:border-zinc-800"
           />
+          <textarea
+            maxLength={500}
+            rows={3}
+            placeholder="Descrição (opcional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="resize-none rounded-lg border border-zinc-200 bg-transparent px-4 py-3 text-sm outline-none focus:border-foreground dark:border-zinc-800"
+          />
           {error && <p className="text-sm text-red-500">{error}</p>}
         </div>
 
@@ -67,7 +76,7 @@ export function AddTaskModal({ token, onClose, onCreated }: AddTaskModalProps) {
             disabled={loading}
             className="rounded-full bg-foreground px-6 py-2 text-sm font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
           >
-            {loading ? "Adicionando..." : "Adicionar"}
+            {loading ? "Concluindo..." : "Concluir"}
           </button>
         </div>
       </form>

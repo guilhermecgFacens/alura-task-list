@@ -101,7 +101,7 @@ export function DashboardView() {
             onClick={() => setIsModalOpen(true)}
             className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-80"
           >
-            Nova task
+            Criar task
           </button>
           <button
             onClick={handleLogout}
