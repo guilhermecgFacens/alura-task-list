@@ -26,9 +26,10 @@
       {
         "hooks": [
           {
-            "type": "agent",
-            "prompt": "Você mantém o AGENTS.md (referenciado por CLAUDE.md) sincronizado com o código deste repositório, ao final de cada interação.\n\nPassos:\n1. Rode `git diff HEAD` e `git status --porcelain` para ver o que mudou nesta interação. Se não houve nenhuma mudança de arquivo, não faça nada e finalize.\n2. Leia AGENTS.md.\n3. Compare as mudanças com o que AGENTS.md descreve: stack, estrutura de pastas, aliases de import, comandos, convenções e armadilhas.\n4. Só edite AGENTS.md se alguma mudança tornar uma afirmação do arquivo desatualizada, incorreta ou incompleta (ex: novo comando, nova pasta/alias, mudança de stack, nova convenção adotada, algo documentado que foi removido). Mudanças de implementação que não afetam o que está documentado NÃO justificam edição — nesse caso, não edite nada.\n5. Se editar, faça a menor mudança possível, mantendo o estilo, formato e idioma (português) do arquivo existente.\n6. Nunca edite CLAUDE.md — ele só aponta para AGENTS.md e não deve mudar.",
-            "timeout": 120
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/sync-agents-md.mjs\"",
+            "timeout": 30,
+            "statusMessage": "Checando AGENTS.md..."
           }
         ]
       }
