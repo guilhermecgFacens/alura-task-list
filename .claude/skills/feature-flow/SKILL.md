@@ -49,15 +49,27 @@ Se a funcionalidade (ou parte dela) tocar código em `src/backend/`, siga TDD: e
 
 Objetivo: garantir que a implementação está correta antes de liberar para PR.
 
-- Rode `npm run lint`.
-- Rode `npm run build`.
-- Rode `npm run test:backend` se algum arquivo em `src/backend/` foi tocado, e `npm run test:frontend` se algum arquivo em `src/frontend/` foi tocado. Todos os testes precisam passar, incluindo os escritos na fase 3.
-- Acione o subagent `code-reviewer` (via `Agent`, `subagent_type: "code-reviewer"`) passando o contexto do que foi implementado (arquivos alterados, `git diff`, e o plano da fase 2) para uma revisão independente focada nas convenções do AGENTS.md, correção, segurança e simplicidade.
-- Faça também sua própria auto-revisão comparando a implementação com o plano da fase 2: confira se algum item do plano ficou pela metade, se algum edge case levantado na fase 1 foi esquecido.
-- Se o `code-reviewer` ou a auto-revisão encontrarem problemas, ou se lint, build ou algum teste falhar, volte para a fase 3 (ou até a fase 2, se o plano estava errado) e corrija — não finalize com pendências conhecidas.
-- Após cada correção, repita **todas** as verificações desta fase (lint, build, testes, revisão) até ficarem limpas.
+1. **Execução (lint, build, testes)**
+   - Rode `npm run lint`. Sem erros.
+   - Rode `npm run build`. Compila sem erros (TypeScript `strict`).
+   - Rode `npm run test:backend` se alterou `src/backend/`. Rode `npm run test:frontend` se alterou `src/frontend/`. Todos os testes passam.
+
+2. **Revisão independente (code-reviewer subagent)**
+   - Chame o subagent `code-reviewer` (via `Agent`, `subagent_type: "code-reviewer"`, ou direto via `/code-reviewer` se disponível).
+   - Passe contexto claro: `git diff HEAD` (diferenças), nomes dos arquivos alterados, descrição breve da feature da fase 2.
+   - Aguarde o relatório do subagent — ele valida AGENTS.md, correção, segurança e simplicidade.
+
+3. **Auto-revisão (você)**
+   - Compare a implementação com o plano da fase 2: algum item ficou pela metade? Algum edge case levantado na fase 1 foi esquecido?
+   - Confira especialmente: lógica em `src/app/`? `any` ou `@ts-ignore`? `userId` vindo de body em vez de JWT? Queries sem filtro por usuário?
+
+4. **Correção de problemas**
+   - Se lint, build, testes, code-reviewer ou auto-revisão encontrarem problemas: volte para fase 3 (ou até fase 2 se o plano estava errado) e corrija.
+   - **Após cada correção, repita todas as verificações desta seção** (lint, build, testes, code-reviewer, auto-revisão) até ficar limpo.
+   - Não finalize com pendências conhecidas.
 
 ### Encerramento
 
-- Só quando lint, build e self-review estiverem OK: avise o usuário que a funcionalidade está pronta, resumindo o que foi feito.
-- **Não crie o pull request.** O usuário revisa e abre o PR manualmente — isso é intencional, apenas informe que está pronto para revisão.
+- Só quando lint, build, testes e revisão estiverem OK: avise o usuário que está **Pronto para revisão/PR**.
+- Resuma o que foi feito (arquivos, changes principais, decisões da fase 2 que foram implementadas).
+- **Não abra PR.** O usuário faz isso manualmente — é intencional, só informe que está pronto.
