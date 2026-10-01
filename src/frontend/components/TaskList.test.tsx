@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TaskList } from "@frontend/components/TaskList";
 import type { Task } from "@frontend/services/tasks.service";
@@ -46,5 +46,72 @@ describe("TaskList", () => {
     render(<TaskList {...baseProps} tasks={tasks} />);
 
     expect(screen.queryByTestId("task-description")).not.toBeInTheDocument();
+  });
+
+  it("calls onDeleteRequest with the task when delete button is clicked", () => {
+    const onDeleteRequest = vi.fn();
+    const task: Task = {
+      id: "1",
+      title: "Comprar leite",
+      description: null,
+      status: "TODO",
+    };
+    const tasks: Task[] = [task];
+
+    render(
+      <TaskList
+        {...baseProps}
+        tasks={tasks}
+        onDeleteRequest={onDeleteRequest}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Remover task Comprar leite"));
+
+    expect(onDeleteRequest).toHaveBeenCalledWith(task);
+  });
+
+  it("disables the delete button when a task is updating", () => {
+    const task: Task = {
+      id: "1",
+      title: "Comprar leite",
+      description: null,
+      status: "TODO",
+    };
+    const tasks: Task[] = [task];
+
+    render(
+      <TaskList
+        {...baseProps}
+        tasks={tasks}
+        updatingTaskId="1"
+      />,
+    );
+
+    expect(
+      screen.getByLabelText("Remover task Comprar leite"),
+    ).toBeDisabled();
+  });
+
+  it("enables the delete button when no task is updating", () => {
+    const task: Task = {
+      id: "1",
+      title: "Comprar leite",
+      description: null,
+      status: "TODO",
+    };
+    const tasks: Task[] = [task];
+
+    render(
+      <TaskList
+        {...baseProps}
+        tasks={tasks}
+        updatingTaskId={null}
+      />,
+    );
+
+    expect(
+      screen.getByLabelText("Remover task Comprar leite"),
+    ).not.toBeDisabled();
   });
 });

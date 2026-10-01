@@ -13,6 +13,7 @@ export default defineConfig({
         test: {
           name: "backend",
           environment: "node",
+          globals: true,
           include: ["src/backend/**/*.test.ts"],
         },
       },
@@ -21,6 +22,7 @@ export default defineConfig({
         test: {
           name: "frontend",
           environment: "jsdom",
+          globals: true,
           setupFiles: ["./vitest.setup.ts"],
           include: ["src/frontend/**/*.test.{ts,tsx}"],
         },
