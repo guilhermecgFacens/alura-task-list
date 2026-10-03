@@ -6,6 +6,7 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   TODO: "A fazer",
   IN_PROGRESS: "Em andamento",
   DONE: "Concluída",
+  CANCELLED: "Cancelada",
 };
 
 const STATUS_OPTIONS = Object.keys(STATUS_LABEL) as TaskStatus[];
@@ -15,6 +16,7 @@ const STATUS_STYLE: Record<TaskStatus, string> = {
   IN_PROGRESS:
     "border-blue-200 text-blue-600 dark:border-blue-900 dark:text-blue-400",
   DONE: "border-green-200 text-green-600 dark:border-green-900 dark:text-green-400",
+  CANCELLED: "border-red-200 text-red-600 dark:border-red-900 dark:text-red-400",
 };
 
 type TaskStatusSelectProps = {

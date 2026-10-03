@@ -27,7 +27,7 @@ Este é um projeto **didático**, feito em um curso de desenvolvimento full stac
 
 ### 2.1 Visão
 
-Gerenciador de tarefas pessoal. Cada pessoa faz login e organiza as **próprias** tasks em três estados.
+Gerenciador de tarefas pessoal. Cada pessoa faz login e organiza as **próprias** tasks em quatro estados.
 
 ### 2.2 Entidades de domínio
 
@@ -35,7 +35,7 @@ Gerenciador de tarefas pessoal. Cada pessoa faz login e organiza as **próprias*
 |---|---|---|
 | `User` | `id` (cuid), `email` (único), `createdAt` | Criado automaticamente no primeiro login |
 | `Task` | `id` (cuid), `title`, `description` (opcional), `status`, `createdAt`, `updatedAt`, `userId` | Sempre pertence a exatamente um usuário |
-| `TaskStatus` | `TODO` \| `IN_PROGRESS` \| `DONE` | Rótulos na UI: "A fazer", "Em andamento", "Concluída" |
+| `TaskStatus` | `TODO` \| `IN_PROGRESS` \| `DONE` \| `CANCELLED` | Rótulos na UI: "A fazer", "Em andamento", "Concluída", "Cancelada" |
 
 ### 2.3 Decisões de produto
 
@@ -165,7 +165,7 @@ Todos os endpoints de tasks exigem `Authorization: Bearer <token>`. Corpo e resp
 |---|---|---|---|---|
 | `POST` | `/api/auth/login` | `{ email }` | `200` `{ token, user: { id, email } }` | `400` email inválido |
 | `POST` | `/api/auth/logout` | — | `200` `{ ok: true }` (stateless; o cliente apaga a sessão) | — |
-| `GET` | `/api/tasks` | `?status=TODO\|IN_PROGRESS\|DONE` (opcional) | `200` `{ tasks: TaskDTO[], count }` | `400` status inválido, `401` |
+| `GET` | `/api/tasks` | `?status=TODO\|IN_PROGRESS\|DONE\|CANCELLED` (opcional) | `200` `{ tasks: TaskDTO[], count }` | `400` status inválido, `401` |
 | `POST` | `/api/tasks` | `{ title, description? }` | `201` `TaskDTO` | `400` título ou descrição inválidos, `401` |
 | `PATCH` | `/api/tasks/:id` | `{ status }` | `200` `TaskDTO` | `400` status inválido, `401`, `404` |
 | `DELETE` | `/api/tasks/:id` | — | `204` sem corpo | `401`, `404` |
