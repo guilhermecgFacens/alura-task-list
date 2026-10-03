@@ -28,6 +28,31 @@ describe("TaskList", () => {
     expect(screen.getByText("Estudar")).toBeInTheDocument();
   });
 
+  it("offers the Cancelada status and calls onStatusChange with CANCELLED", () => {
+    const onStatusChange = vi.fn();
+    const tasks: Task[] = [
+      { id: "1", title: "Comprar leite", description: null, status: "TODO" },
+    ];
+
+    render(
+      <TaskList
+        {...baseProps}
+        tasks={tasks}
+        onStatusChange={onStatusChange}
+      />,
+    );
+
+    expect(
+      screen.getByRole("option", { name: "Cancelada" }),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Status da task Comprar leite"), {
+      target: { value: "CANCELLED" },
+    });
+
+    expect(onStatusChange).toHaveBeenCalledWith("1", "CANCELLED");
+  });
+
   it("shows the description below the title when it exists", () => {
     const tasks: Task[] = [
       { id: "1", title: "Comprar leite", description: "Integral", status: "TODO" },

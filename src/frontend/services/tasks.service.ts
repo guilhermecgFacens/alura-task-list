@@ -1,6 +1,6 @@
 import { http } from "@frontend/services/http";
 
-export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE";
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "CANCELLED";
 
 export type Task = {
   id: string;

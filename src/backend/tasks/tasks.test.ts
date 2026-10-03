@@ -58,6 +58,17 @@ describe("listTasks", () => {
     );
   });
 
+  it("accepts CANCELLED as a status filter", async () => {
+    vi.mocked(tasksData.findTasksByUser).mockResolvedValue([]);
+
+    await listTasks("user-1", "CANCELLED");
+
+    expect(tasksData.findTasksByUser).toHaveBeenCalledWith(
+      "user-1",
+      "CANCELLED",
+    );
+  });
+
   it("returns an empty list without error when the user has no tasks", async () => {
     vi.mocked(tasksData.findTasksByUser).mockResolvedValue([]);
 
@@ -330,6 +341,20 @@ describe("updateTaskStatus", () => {
       "user-1",
       "task-1",
       TaskStatus.IN_PROGRESS,
+    );
+  });
+
+  it("accepts CANCELLED as a valid status", async () => {
+    const updated = { ...rawTask, status: TaskStatus.CANCELLED };
+    vi.mocked(tasksData.updateTaskStatusByIdAndUser).mockResolvedValue(updated);
+
+    const result = await updateTaskStatus("user-1", "task-1", "CANCELLED");
+
+    expect(result).toEqual({ ...taskDto, status: TaskStatus.CANCELLED });
+    expect(tasksData.updateTaskStatusByIdAndUser).toHaveBeenCalledWith(
+      "user-1",
+      "task-1",
+      "CANCELLED",
     );
   });
 
