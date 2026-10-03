@@ -6,7 +6,7 @@ Guia rápido para agentes de IA (Claude Code, Cursor, Copilot, etc.) trabalhando
 
 ## O que é o projeto
 
-Gerenciador de tasks simples: login por email, dashboard com tasks e status (`TODO` / `IN_PROGRESS` / `DONE`).
+Gerenciador de tasks simples: login por email, dashboard com tasks e status (`TODO` / `IN_PROGRESS` / `DONE` / `CANCELLED`).
 
 Stack: **Next.js (App Router)** + **TypeScript** + **Prisma (SQLite)** + **JWT** + **Zod** (validação).
 
