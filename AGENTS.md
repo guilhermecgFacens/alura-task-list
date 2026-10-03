@@ -97,6 +97,7 @@ Detalhes em [src/frontend/AGENTS.md](src/frontend/AGENTS.md).
 - **Conflito com PRD.md?** Aponte e pergunte. Não escolha sozinho.
 - **Mudanças arquiteturais** (Server Components, auth, banco, estado global) precisam de aprovação explícita.
 - Siga a skill **feature-flow**: discovery → plano confirmado → TDD/implementação → verificação + code-reviewer. **Não abra PR** — o usuário faz.
+- **Banco local: use o MCP `sqlite`, não gere queries na mão.** Qualquer leitura/escrita direta no `dev.db` (consultar dados, inspecionar schema, depurar, checar dados de teste) passa pelas tools `mcp__sqlite__*`, seguindo a skill **sqlite-mcp**. Nada de `sqlite3` no shell, script avulso ou apenas devolver SQL ao usuário. Exceções: código da app (Prisma Client) e mudanças de schema (migrations).
 
 ## Checklist antes de abrir um PR
 
@@ -143,5 +144,6 @@ Baseado em [PRD.md §11](PRD.md#11-checklist-rápido-de-revisão):
 | [src/backend/AGENTS.md](src/backend/AGENTS.md) | Padrões: Zod, DTO, data layer, erros, testes TDD |
 | [src/frontend/AGENTS.md](src/frontend/AGENTS.md) | Containers/components, services, composição |
 | [.claude/skills/feature-flow/SKILL.md](.claude/skills/feature-flow/SKILL.md) | Fluxo discovery → plano → TDD → verificação |
+| [.claude/skills/sqlite-mcp/SKILL.md](.claude/skills/sqlite-mcp/SKILL.md) | Regra: acesso direto ao `dev.db` só via MCP `sqlite` |
 | [README.md](README.md) | Setup e instruções para rodar o projeto |
 | [docs/plano-*.md](docs/) | Planos de features (ex.: plano-endpoint-listar-tasks.md) |
