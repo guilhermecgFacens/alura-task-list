@@ -1,6 +1,6 @@
 # Projeto do curso
 
-Gerenciador de tasks simples: login por email, dashboard com suas tasks e status (`TODO` / `IN_PROGRESS` / `DONE`).
+Gerenciador de tasks simples: login por email, dashboard com suas tasks e status (`TODO` / `IN_PROGRESS` / `DONE` / `CANCELLED`).
 
 Stack: **Next.js (App Router)** + **TypeScript** + **Prisma** (SQLite) + **JWT**.
 
